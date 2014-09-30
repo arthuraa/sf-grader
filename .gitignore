@@ -1,1 +1,7 @@
 Makefile.coq*
+*.cm*
+*.a
+*.o
+*.d
+*.vo
+*.glob
