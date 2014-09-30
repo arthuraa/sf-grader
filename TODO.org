@@ -1,0 +1,5 @@
+* DONE Learn how to print a term
+* DONE Find out the type of a given constant
+* Print all the assumptions used by that constant
+* Require library from ML
+* Make a custom coq top level that only runs the plugin
