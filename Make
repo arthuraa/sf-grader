@@ -1,4 +1,4 @@
 -install none
 -I src
-src/grader.ml
-src/grader.mllib
+src/graderplugin.ml
+src/graderplugin.mllib
