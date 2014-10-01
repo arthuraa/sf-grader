@@ -9,6 +9,7 @@ open Term
 open Util
 
 let (|>) x f = f x
+let (@@) f x = f x
 
 let has_no_assumptions (id : global_reference) : bool =
   constr_of_global id |>
@@ -41,7 +42,7 @@ let compare_defs (file : string) (id : string) : bool =
 let () =
   Mltop.add_known_plugin (fun () -> ()) "grader";
   Printf.printf "Grader plugin successfully loaded\n\n";
-  let out = open_out "result" in
+  let out = open_out @@ Sys.getenv "SFGRADINGRESULT" in
   let f   = Format.formatter_of_out_channel out in
   let result = if compare_defs "MoreCoq" "filter_exercise" then "true" else "false" in
   Format.fprintf f "Worked = %s@." result;

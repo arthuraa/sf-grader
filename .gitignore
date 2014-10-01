@@ -5,3 +5,4 @@ Makefile.coq*
 *.d
 *.vo
 *.glob
+grader
