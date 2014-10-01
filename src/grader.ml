@@ -38,8 +38,11 @@ let compare_defs (file : string) (id : string) : bool =
     has_no_assumptions sub
   | None -> false
 
-let () = Mltop.add_known_plugin (fun () ->
+let () =
+  Mltop.add_known_plugin (fun () -> ()) "grader";
   Printf.printf "Grader plugin successfully loaded\n\n";
+  let out = open_out "result" in
+  let f   = Format.formatter_of_out_channel out in
   let result = if compare_defs "MoreCoq" "filter_exercise" then "true" else "false" in
-  Printf.printf "Worked = %s\n\n" result
-) "grader"
+  Format.fprintf f "Worked = %s@." result;
+  close_out out
