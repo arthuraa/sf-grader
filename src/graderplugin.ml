@@ -8,9 +8,6 @@ open Printer
 open Term
 open Util
 
-let (|>) x f = f x
-let (@@) f x = f x
-
 let has_no_assumptions (id : global_reference) : bool =
   constr_of_global id |>
   Assumptions.assumptions ~add_opaque:false Names.full_transparent_state |>

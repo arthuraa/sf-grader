@@ -1,6 +1,3 @@
-let (|>) x f = x f
-let (@@) f x = f x
-
 type options = {
   sf_path : string;
   assignment : string;
