@@ -2,7 +2,7 @@
 * DONE Find out the type of a given constant
 * DONE Find out if some type matches another type
 * DONE Find all the assumptions used by that constant
+* DONE Make list of all definitions that should be checked
 * Filter permitted assumptions from that list
 * Require Coq library from ML
-* Make list of all definitions that should be checked
 * Make a custom coq top level that only runs the plugin
