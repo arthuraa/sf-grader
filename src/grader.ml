@@ -5,7 +5,14 @@ type options = {
 }
 
 let usage () : 'a =
-  Printf.printf "grader OPTIONS\n";
+  List.iter print_endline [
+    "USAGE: grader [OPTION] ASSIGNMENT";
+    "Grade submissions of Software Foundations exercises";
+    "";
+    "OPTIONS";
+    "  --sf-path - The path to the Software Foundations sources";
+    "  -o        - Where to output grading results (default: results)";
+  ];
   exit 0
 
 let read_options () : options =
@@ -14,6 +21,7 @@ let read_options () : options =
   let result_file = ref None in
   let rec process args =
     begin match args with
+    | "--help" :: _ -> usage ()
     | "--sf-path" :: path :: args ->
       sf_path := Some path;
       process args
@@ -62,4 +70,32 @@ let grade () : unit =
   | Unix.WEXITED i -> Printf.printf "WEXITED %u\n" i
   | _ -> ()
 
-let _ = grade ()
+let translate_file_name name =
+  let i = String.index name '_' in
+  let j = String.index_from name (i + 1) '_' in
+  let j = String.index_from name (j + 1) '_' in
+  (String.sub name 0 i,
+   String.sub name (j + 1) (String.length name - j - 1))
+
+let ensure_dir_exists dir =
+  if not @@ Sys.file_exists dir then Unix.mkdir dir 0o744
+
+let (/) base name =
+  base ^ "/" ^ name
+
+let cp source dest =
+  ignore @@ Sys.command @@ Printf.sprintf "cp %s %s" source dest
+
+let copy_subs () =
+  let com = Printf.sprintf "unzip -qq %s -d %s" "submissions.zip" "tmp" in
+  ignore @@ Sys.command com;
+  let files = Sys.readdir "tmp" in
+  ensure_dir_exists "submissions";
+  Array.iter (fun file ->
+    let name, file' = translate_file_name file in
+    let dir = "submissions" / name in
+    ensure_dir_exists dir;
+    cp ("tmp"/file) (dir/file');
+  ) files
+
+let _ = copy_subs ()

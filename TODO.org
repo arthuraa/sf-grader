@@ -8,3 +8,4 @@
 * Make a custom coq top level that only runs the plugin
 * Make script robust wrt definitions inside modules
 * Exclude advanced exercises for standard students
+* Remove "-late" suffix from Canvas' names
