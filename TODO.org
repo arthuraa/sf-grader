@@ -7,3 +7,4 @@
 * Require Coq library from ML
 * Make a custom coq top level that only runs the plugin
 * Make script robust wrt definitions inside modules
+* Exclude advanced exercises for standard students
