@@ -6,3 +6,4 @@
 * Filter permitted assumptions from that list
 * Require Coq library from ML
 * Make a custom coq top level that only runs the plugin
+* Make script robust wrt definitions inside modules
