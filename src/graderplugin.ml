@@ -12,11 +12,24 @@ type item =
 | Auto of string * int
 | Manual of string * int
 
+let is_auto = function
+  | Auto (_,_) -> true
+  | _ -> false
+
+let is_manual i = not @@ is_auto i
+
 type exercise = {
   ex_name : string;
   ex_advanced : bool;
   ex_items : item list
 }
+
+let ex_auto_points ex =
+  List.fold_left (fun acc i ->
+    match i with
+    | Auto (_, n) -> acc + n
+    | _ -> acc
+  ) 0 ex.ex_items
 
 let sf_path = Sys.getenv "SFGRADERSFPATH"
 let assignment = Sys.getenv "SFGRADERASSIGNMENT"
@@ -119,22 +132,51 @@ let () =
   let out = open_out result_file in
   let f   = Format.formatter_of_out_channel out in
   let exs = process_file @@ read_file @@ Printf.sprintf "%s/%s.v" sf_path assignment in
-  let grade_ex ex =
-    let auto_max = List.fold_left (fun acc i ->
-      match i with
-      | Auto (_, n) -> acc + n
-      | _ -> acc)
-      0 ex.ex_items in
-    let auto_total = List.fold_left (fun acc i ->
+  let ex_auto_grades ex =
+    List.fold_left (fun acc i ->
       match i with
       | Auto (id, n) -> if compare_defs assignment id then acc + n else acc
       | _ -> acc)
       0 ex.ex_items in
-    let manual_max = List.fold_left (fun acc i ->
-      match i with
-      | Manual (_, n) -> acc + n
-      | _ -> acc)
-      0 ex.ex_items in
+  let auto_grades = List.map ex_auto_grades exs in
+  Format.fprintf f "Automatic Grades@.";
+  Format.fprintf f "================@.@.";
+  List.iter2 (fun ex grade ->
+    let max = ex_auto_points ex in
     let cat = if ex.ex_advanced then "A" else "S" in
-    Format.fprintf f "%s (%s) %d/%d %d@." ex.ex_name cat auto_total auto_max manual_max in
-  List.iter grade_ex exs
+    if max <> 0 then Format.fprintf f "%s (%s) %d/%d@." ex.ex_name cat grade max
+  ) exs auto_grades;
+  let max_std =
+    List.fold_left (fun acc ex ->
+      if ex.ex_advanced then acc
+      else acc + ex_auto_points ex
+    ) 0 exs in
+  let total_std =
+    List.fold_left2 (fun acc ex grade ->
+      if ex.ex_advanced then acc
+      else acc + grade
+    ) 0 exs auto_grades in
+  let max_adv =
+    List.fold_left (fun acc ex ->
+      if ex.ex_advanced then acc + ex_auto_points ex
+      else acc
+    ) 0 exs in
+  let total_adv =
+    List.fold_left2 (fun acc ex grade ->
+      if ex.ex_advanced then acc + grade
+      else acc
+    ) 0 exs auto_grades in
+  Format.fprintf f "@.Standard: %d/%d@.Advanced: %d/%d@.@.@." total_std max_std total_adv max_adv;
+  Format.fprintf f "Manual Grades@.";
+  Format.fprintf f "=============@.@.";
+  List.iter (fun ex ->
+    if List.exists is_manual ex.ex_items then begin
+      let cat = if ex.ex_advanced then "A" else "S" in
+      Format.fprintf f "%s (%s)@." ex.ex_name cat;
+      List.iter (fun i ->
+        match i with
+        | Manual (com, n) -> Format.fprintf f "  %s - %d@." com n
+        | _ -> ()
+      ) ex.ex_items
+    end
+  ) exs
