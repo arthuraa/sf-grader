@@ -57,8 +57,10 @@ let compare_defs (file : string) (id : string) : bool =
   | Some sub ->
     pp (pr_constr (type_of_global orig));
     pp (brk (0,0));
-    pp (pr_constr (type_of_global orig));
+    pp (pr_constr (type_of_global sub));
     pp (brk (0,0));
+    if not @@ has_no_assumptions sub then Format.printf "I have assumptions!@.";
+    Format.printf "@.";
     is_conv (type_of_global sub) (type_of_global orig) &&
     has_no_assumptions sub
   | None -> false
@@ -123,19 +125,23 @@ let process_file (file : string) : exercise list =
   let start = try Some (find_substring_from file 0 ex_tag) with Not_found -> None in
   match start with
   | Some start ->
-    (try read_exs start [] with _ -> Printf.printf "Error while reading file\n"; exit 1)
+    (try read_exs start [] with _ -> Format.printf "Error while reading file@."; exit 1)
   | None -> []
 
 let () =
   Mltop.add_known_plugin (fun () -> ()) "grader";
-  Printf.printf "Grader plugin successfully loaded\n\n";
+  Format.printf "Grader plugin successfully loaded@.@.";
   let out = open_out result_file in
   let f   = Format.formatter_of_out_channel out in
   let exs = process_file @@ read_file @@ Printf.sprintf "%s/%s.v" sf_path assignment in
   let ex_auto_grades ex =
     List.fold_left (fun acc i ->
       match i with
-      | Auto (id, n) -> if compare_defs assignment id then acc + n else acc
+      | Auto (id, n) ->
+        Format.printf "Item %s is worth %d@." id n;
+        if compare_defs assignment id then
+          (Format.printf "Convertible@."; acc + n)
+        else (Format.printf "Not convertible@."; acc)
       | _ -> acc)
       0 ex.ex_items in
   let auto_grades = List.map ex_auto_grades exs in
