@@ -1,12 +1,12 @@
 type options = {
   sf_path : string;
-  assignment : string;
+  submissions : string;
   result_file : string
 }
 
 let usage () : 'a =
   List.iter print_endline [
-    "USAGE: grader [OPTION] ASSIGNMENT";
+    "USAGE: grader [OPTION] SUBMISSIONS";
     "Grade submissions of Software Foundations exercises";
     "";
     "OPTIONS";
@@ -17,7 +17,7 @@ let usage () : 'a =
 
 let read_options () : options =
   let sf_path = ref None in
-  let assignment = ref None in
+  let submissions = ref None in
   let result_file = ref None in
   let rec process args =
     begin match args with
@@ -31,44 +31,25 @@ let read_options () : options =
       process args
     | "-o" :: _ -> usage ()
     | path :: args ->
-      if !assignment == None then
-        (assignment := Some path;
+      if !submissions == None then
+        (submissions := Some path;
          process args)
       else usage ()
     | [] -> ()
     end in
   let args = Array.to_list Sys.argv in
   process (List.tl args);
-  match !sf_path, !assignment with
-  | Some sf_path, Some assignment ->
+  match !sf_path, !submissions with
+  | Some sf_path, Some submissions ->
     { result_file =
         begin match !result_file with
         | Some rf -> rf
         | None -> "result"
         end;
-      sf_path = sf_path; assignment = assignment }
+      sf_path = sf_path; submissions = submissions }
   | _, _ -> usage ()
 
 let o = read_options ()
-
-let plugin_loader_com = "Declare ML Module \"graderplugin\".\n"
-
-let coqcom : string =
-  Printf.sprintf "coqtop -I %s -I src -require %s -require Submission >> out 2>&1"
-    o.sf_path o.assignment
-
-let grade () : unit =
-  let env = Array.append [|"SFGRADERRESULT=" ^ o.result_file;
-                           "SFGRADERSFPATH=" ^ o.sf_path;
-                           "SFGRADERASSIGNMENT=" ^ o.assignment |] @@
-    Unix.environment () in
-  let proc = Unix.open_process_full coqcom env in
-  let input, output, _ = proc in
-  output_string output plugin_loader_com;
-  flush output;
-  match Unix.close_process_full proc with
-  | Unix.WEXITED i -> Printf.printf "WEXITED %u\n" i
-  | _ -> ()
 
 let translate_file_name name =
   let i = String.index name '_' in
@@ -86,6 +67,35 @@ let (/) base name =
 let cp source dest =
   ignore @@ Sys.command @@ Printf.sprintf "cp %s %s" source dest
 
+let plugin_loader_com = "Declare ML Module \"graderplugin\".\n"
+
+let grade_sub path file : unit =
+  let assignment = String.sub file 0 (String.length file - 2) in
+  let tmp = "tmp" / "Submission.v" in
+  cp (path/file) tmp;
+  print_string (path/file);
+  let res = Sys.command @@ Printf.sprintf "coqc -I %s %s > %s.out 2>&1" o.sf_path tmp (path/file) in
+  if res <> 0 then
+    print_endline " compilation error"
+  else begin
+    print_endline " ok";
+    let env = Array.append [|"SFGRADERRESULT=" ^ (path/file) ^ ".res";
+                             "SFGRADERSFPATH=" ^ o.sf_path;
+                             "SFGRADERASSIGNMENT=" ^ assignment |] @@
+      Unix.environment () in
+    let coqcom =
+      Printf.sprintf
+        "coqtop -I %s -I tmp -I src -require %s -require Submission >> out 2>&1"
+        o.sf_path assignment in
+    let proc = Unix.open_process_full coqcom env in
+    let input, output, _ = proc in
+    output_string output plugin_loader_com;
+    flush output;
+    match Unix.close_process_full proc with
+    | Unix.WEXITED i -> Printf.printf "WEXITED %u\n" i
+    | _ -> ()
+  end
+
 let copy_subs () =
   let com = Printf.sprintf "unzip -qq %s -d %s" "submissions.zip" "tmp" in
   ignore @@ Sys.command com;
@@ -96,6 +106,7 @@ let copy_subs () =
     let dir = "submissions" / name in
     ensure_dir_exists dir;
     cp ("tmp"/file) (dir/file');
+    grade_sub dir file'
   ) files
 
 let _ = copy_subs ()
