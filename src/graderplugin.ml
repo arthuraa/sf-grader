@@ -55,14 +55,17 @@ let compare_defs (file : string) (id : string) : bool =
   let sub = ofind_reference ["Submission"] id in
   match sub with
   | Some sub ->
-    pp (pr_constr (type_of_global orig));
-    pp (brk (0,0));
-    pp (pr_constr (type_of_global sub));
-    pp (brk (0,0));
+    let torig =
+      Str.global_replace (Str.regexp_string "\n") "" @@
+      Str.global_replace (Str.regexp_string @@ file ^ ".") "" @@
+        string_of_ppcmds @@ pr_constr @@ type_of_global orig in
+    let tnew =
+      Str.global_replace (Str.regexp_string "\n") "" @@
+        string_of_ppcmds @@ pr_constr @@ type_of_global sub in
+    Format.printf "%s@.%s@." torig tnew;
     if not @@ has_no_assumptions sub then Format.printf "I have assumptions!@.";
     Format.printf "@.";
-    is_conv (type_of_global sub) (type_of_global orig) &&
-    has_no_assumptions sub
+    torig = tnew && has_no_assumptions sub
   | None -> false
 
 (** Returns true iff string pre occurs as a substring of s at position i *)
