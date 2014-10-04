@@ -31,6 +31,13 @@ let ex_auto_points ex =
     | _ -> acc
   ) 0 ex.ex_items
 
+let ex_manual_points ex =
+  List.fold_left (fun acc i ->
+    match i with
+    | Manual (_, n) -> acc + n
+    | _ -> acc
+  ) 0 ex.ex_items
+
 let sf_path = Sys.getenv "SFGRADERSFPATH"
 let assignment = Sys.getenv "SFGRADERASSIGNMENT"
 let result_file = Sys.getenv "SFGRADERRESULT"
@@ -188,4 +195,15 @@ let () =
         | _ -> ()
       ) ex.ex_items
     end
-  ) exs
+  ) exs;
+  let max_std_manual =
+    List.fold_left (fun acc ex ->
+      if ex.ex_advanced then acc
+      else acc + ex_manual_points ex
+    ) 0 exs in
+  let max_adv_manual =
+    List.fold_left (fun acc ex ->
+      if ex.ex_advanced then acc + ex_manual_points ex
+      else acc
+    ) 0 exs in
+  Format.fprintf f "@.Standard: -/%d@.Advanced: -/%d@." max_std_manual max_adv_manual
