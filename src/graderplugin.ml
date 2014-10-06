@@ -75,21 +75,6 @@ let compare_defs (file : string) (id : string) : bool =
     torig = tnew && has_no_assumptions sub
   | None -> false
 
-(** Returns true iff string pre occurs as a substring of s at position i *)
-let occurs_at (s : string) (i : int) (pre : string) : bool =
-  let rec loop j =
-    if String.length pre = j then true
-    else if String.length s = i + j then false
-    else pre.[j] = s.[i + j] && loop (j + 1) in
-  loop 0
-
-let find_substring_from (s : string) (i : int) (sub : string) : int =
-  let rec loop i =
-    if String.length s <= i then raise @@ Not_found
-    else if occurs_at s i sub then i
-    else loop (i + 1) in
-  loop i
-
 let read_file (path : string) : string =
   let chan = open_in path in
   let nbytes = in_channel_length chan in
@@ -99,44 +84,55 @@ let read_file (path : string) : string =
   s
 
 let process_file (file : string) : exercise list =
-  let ex_tag = "(* EX" in
-  let manual_tag = "(* GRADE_MANUAL" in
-  let auto_tag = "(* GRADE_THEOREM" in
-  let term = "*)" in
-  let rec read_exs i exs =
-    if String.length file <= i then List.rev exs else
-    let i = i + String.length ex_tag + 1 in
-    let advanced = file.[i] = 'A' in
-    let i = String.index_from file i ' ' in
-    let j = find_substring_from file i term in
-    let name = String.trim @@ String.sub file i (j - i) in
-    let rec read_items i items =
-      if String.length file <= i || occurs_at file i ex_tag then
-        let ex = { ex_name = name;
-                   ex_advanced = advanced;
-                   ex_items = List.rev items } in
-        read_exs i (ex :: exs)
-      else if occurs_at file i manual_tag then
-        let i = i + String.length manual_tag in
-        let j = String.index_from file i ':' in
-        let k = find_substring_from file i term in
-        let n = int_of_string @@ String.trim @@ String.sub file i (j - i) in
-        let m = String.trim @@ String.sub file (j + 1) (k - j - 1) in
-        read_items (k + String.length term) (Manual (m, n) :: items)
-      else if occurs_at file i auto_tag then
-        let i = i + String.length auto_tag in
-        let j = String.index_from file i ':' in
-        let k = find_substring_from file i term in
-        let n = int_of_string @@ String.trim @@ String.sub file i (j - i) in
-        let m = String.trim @@ String.sub file (j + 1) (k - j - 1) in
-        read_items (k + String.length term) (Auto (m, n) :: items)
-      else read_items (i + 1) items in
-    read_items (j + String.length term) [] in
-  let start = try Some (find_substring_from file 0 ex_tag) with Not_found -> None in
-  match start with
-  | Some start ->
-    (try read_exs start [] with _ -> Format.printf "Error while reading file@."; exit 1)
-  | None -> []
+  let tag_re = Str.regexp "^(\\* \\([^\n]*\\) \\*)" in
+  let ex_re = Str.regexp "\\(EX[^ ]*\\) +(\\(.*\\))" in
+  let manual_re = Str.regexp "GRADE_MANUAL \\([0-9]+\\): \\(.*\\)" in
+  let auto_re = Str.regexp "GRADE_THEOREM \\([0-9]+\\): \\(.*\\)" in
+
+  let find_next i =
+    try
+      let _ = Str.search_forward tag_re file i in
+      let j = Str.match_end () in
+      let tag = Str.matched_group 1 file in
+      if Str.string_match ex_re tag 0 then
+        let name = Str.matched_group 2 file in
+        let advanced = String.contains (Str.matched_group 1 file) 'A' in
+        `New_ex (name, advanced, j)
+      else `Tag (tag, j)
+    with Not_found -> `End in
+
+  let rec read i name advanced exs items =
+    match find_next i with
+    | `New_ex (name', advanced', i) ->
+      let ex = { ex_name = name;
+                 ex_advanced = advanced;
+                 ex_items = List.rev items } in
+      read i name' advanced' (ex :: exs) []
+    | `Tag (tag, i) ->
+      if Str.string_match manual_re tag 0 then
+        let points = int_of_string @@ Str.matched_group 1 tag in
+        let comment = Str.matched_group 2 tag in
+        read i name advanced exs (Manual (comment, points) :: items)
+      else if Str.string_match auto_re tag 0 then
+        let points = int_of_string @@ Str.matched_group 1 tag in
+        let id = Str.matched_group 2 tag in
+        read i name advanced exs (Auto (id, points) :: items)
+      else
+        read i name advanced exs items
+    | `End ->
+      let ex = { ex_name = name;
+                 ex_advanced = advanced;
+                 ex_items = List.rev items } in
+      List.rev (ex :: exs) in
+
+  let rec find_first_ex i =
+    match find_next i with
+    | `New_ex (name, advanced, i) ->
+      read i name advanced [] []
+    | `Tag (_, i) -> find_first_ex i
+    | `End -> [] in
+
+  find_first_ex 0
 
 let () =
   Mltop.add_known_plugin (fun () -> ()) "grader";
