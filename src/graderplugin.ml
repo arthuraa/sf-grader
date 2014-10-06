@@ -92,8 +92,8 @@ let process_file (file : string) : exercise list =
       let j = Str.match_end () in
       let tag = Str.matched_group 1 file in
       if Str.string_match ex_re tag 0 then
-        let name = Str.matched_group 2 file in
-        let advanced = String.contains (Str.matched_group 1 file) 'A' in
+        let name = Str.matched_group 2 tag in
+        let advanced = String.contains (Str.matched_group 1 tag) 'A' in
         `New_ex (name, advanced, j)
       else `Tag (tag, j)
     with Not_found -> `End in
