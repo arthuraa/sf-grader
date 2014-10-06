@@ -69,9 +69,6 @@ let compare_defs (file : string) (id : string) : bool =
     let tnew =
       Str.global_replace (Str.regexp_string "\n") "" @@
         string_of_ppcmds @@ pr_constr @@ type_of_global sub in
-    Format.printf "%s@.%s@." torig tnew;
-    if not @@ has_no_assumptions sub then Format.printf "I have assumptions!@.";
-    Format.printf "@.";
     torig = tnew && has_no_assumptions sub
   | None -> false
 
@@ -144,10 +141,8 @@ let () =
     List.fold_left (fun acc i ->
       match i with
       | Auto (id, n) ->
-        Format.printf "Item %s is worth %d@." id n;
-        if compare_defs assignment id then
-          (Format.printf "Convertible@."; acc + n)
-        else (Format.printf "Not convertible@."; acc)
+        if compare_defs assignment id then acc + n
+        else acc
       | _ -> acc)
       0 ex.ex_items in
   let auto_grades = List.map ex_auto_grades exs in
