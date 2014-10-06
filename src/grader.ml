@@ -125,10 +125,10 @@ let grade_subs path =
   let com = Printf.sprintf "unzip -qq %s -d %s" path "tmp" in
   ignore @@ Sys.command com;
   let files = Sys.readdir "tmp" in
-  ensure_dir_exists "submission";
+  ensure_dir_exists "submissions";
   Array.iter (fun file ->
     let name, file' = translate_file_name file in
-    let dir = "submission" / name in
+    let dir = "submissions" / name in
     let path = dir / file' in
     ensure_dir_exists dir;
     cp ("tmp"/file) path;
