@@ -52,11 +52,13 @@ let read_options () : options =
 let o = read_options ()
 
 let translate_file_name name =
-  let i = String.index name '_' in
-  let j = String.index_from name (i + 1) '_' in
-  let j = String.index_from name (j + 1) '_' in
-  (String.sub name 0 i,
-   String.sub name (j + 1) (String.length name - j - 1))
+  let file_format = Str.regexp "\\([^-]*\\)--\\([^_]*\\)_[^_]*_[^_]*_\\(.*\\)" in
+  if not @@ Str.string_match file_format name 0 then
+    failwith @@ Printf.sprintf "Don't know what to do with file %s" name;
+  let last_name = Str.matched_group 1 name in
+  let first_name = Str.matched_group 2 name in
+  let file_name = Str.matched_group 3 name in
+  (Printf.sprintf "%s-%s" last_name first_name, file_name)
 
 let ensure_dir_exists dir =
   if not @@ Sys.file_exists dir then Unix.mkdir dir 0o744
