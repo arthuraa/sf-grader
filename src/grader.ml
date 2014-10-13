@@ -58,6 +58,12 @@ let translate_file_name name =
   let last_name = Str.matched_group 1 name in
   let first_name = Str.matched_group 2 name in
   let file_name = Str.matched_group 3 name in
+  let first_name =
+    (* Strip "-late" prefix, if present *)
+    if Str.string_match (Str.regexp "\\(.*\\)-late$") first_name 0 then begin
+      Str.matched_group 1 first_name
+    end
+    else first_name in
   (Printf.sprintf "%s-%s" last_name first_name, file_name)
 
 let ensure_dir_exists dir =
