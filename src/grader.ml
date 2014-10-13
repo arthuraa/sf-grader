@@ -1,7 +1,7 @@
 type options = {
   sf_path : string;
   submission : string;
-  result_file : string
+  result_dir : string
 }
 
 let usage () : 'a =
@@ -11,14 +11,14 @@ let usage () : 'a =
     "";
     "OPTIONS";
     "  --sf-path - The path to the Software Foundations sources";
-    "  -o        - Where to output grading results (default: results)";
+    "  -o        - Where to output grading results (default: submissions)";
   ];
   exit 0
 
 let read_options () : options =
   let sf_path = ref None in
   let submission = ref None in
-  let result_file = ref None in
+  let result_dir = ref None in
   let rec process args =
     begin match args with
     | "--help" :: _ -> usage ()
@@ -27,7 +27,7 @@ let read_options () : options =
       process args
     | "--sf-path" :: _ -> usage ()
     | "-o" :: path :: args ->
-      result_file := Some path;
+      result_dir := Some path;
       process args
     | "-o" :: _ -> usage ()
     | path :: args ->
@@ -41,10 +41,10 @@ let read_options () : options =
   process (List.tl args);
   match !sf_path, !submission with
   | Some sf_path, Some submission ->
-    { result_file =
-        begin match !result_file with
+    { result_dir =
+        begin match !result_dir with
         | Some rf -> rf
-        | None -> "result"
+        | None -> "submissions"
         end;
       sf_path = sf_path; submission = submission }
   | _, _ -> usage ()
@@ -125,10 +125,10 @@ let grade_subs path =
   let com = Printf.sprintf "unzip -qq %s -d %s" path "tmp" in
   ignore @@ Sys.command com;
   let files = Sys.readdir "tmp" in
-  ensure_dir_exists "submissions";
+  ensure_dir_exists o.result_dir;
   Array.iter (fun file ->
     let name, file' = translate_file_name file in
-    let dir = "submissions" / name in
+    let dir = o.result_dir / name in
     let path = dir / file' in
     ensure_dir_exists dir;
     cp ("tmp"/file) path;
