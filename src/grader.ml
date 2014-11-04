@@ -6,7 +6,7 @@ type options = {
 
 let usage () : 'a =
   List.iter print_endline [
-    "USAGE: grader [OPTION] SUBMISSION";
+    "USAGE: grader [OPTIONS] SUBMISSION";
     "Grade submissions of Software Foundations exercises";
     "";
     "OPTIONS";

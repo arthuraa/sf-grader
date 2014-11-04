@@ -8,12 +8,19 @@ open Printer
 open Term
 open Util
 
-type item =
-| Auto of string * int
-| Manual of string * int
+type meth =
+| CheckType of string
+| RunTest of string * string
+| Manual of string
+
+type item = {
+  meth : meth;
+  points : int
+}
 
 let is_auto = function
-  | Auto (_,_) -> true
+  | CheckType _ -> true
+  | RunTest (_,_) -> true
   | _ -> false
 
 let is_manual i = not @@ is_auto i
@@ -24,19 +31,17 @@ type exercise = {
   ex_items : item list
 }
 
-let ex_auto_points ex =
+let ex_points f ex =
   List.fold_left (fun acc i ->
-    match i with
-    | Auto (_, n) -> acc + n
-    | _ -> acc
+    if f i then acc + i.points
+    else acc
   ) 0 ex.ex_items
 
+let ex_auto_points ex =
+  ex_points (fun i -> is_auto i.meth) ex
+
 let ex_manual_points ex =
-  List.fold_left (fun acc i ->
-    match i with
-    | Manual (_, n) -> acc + n
-    | _ -> acc
-  ) 0 ex.ex_items
+  ex_points (fun i -> is_manual i.meth) ex
 
 let sf_path = Sys.getenv "SFGRADERSFPATH"
 let assignment = Sys.getenv "SFGRADERASSIGNMENT"
@@ -56,7 +61,9 @@ let ofind_reference (path : string list) (id : string) : global_reference option
   with
   | Anomaly (_,_) -> None
 
-let compare_defs (file : string) (id : string) : bool =
+(** Compare the type of a definition against the one it should have,
+    given in the SF sources *)
+let check_type (file : string) (id : string) : bool =
   let orig = find_reference "Couldn't find original definition in SF file"
     [file] id in
   let sub = ofind_reference ["Submission"] id in
@@ -72,6 +79,10 @@ let compare_defs (file : string) (id : string) : bool =
     torig = tnew && has_no_assumptions sub
   | None -> false
 
+let run_test (file : string) (test_fun : string) (id : string) : bool =
+  Format.printf "Should run %s on %s@." test_fun id;
+  false
+
 let read_file (path : string) : string =
   let chan = open_in path in
   let nbytes = in_channel_length chan in
@@ -84,7 +95,8 @@ let process_file (file : string) : exercise list =
   let tag_re = Str.regexp "^(\\* \\([^\n]*\\) \\*)" in
   let ex_re = Str.regexp "\\(EX[^ ]*\\) +(\\(.*\\))" in
   let manual_re = Str.regexp "GRADE_MANUAL \\([0-9]+\\): \\(.*\\)" in
-  let auto_re = Str.regexp "GRADE_THEOREM \\([0-9]+\\): \\(.*\\)" in
+  let check_type_re = Str.regexp "GRADE_THEOREM \\([0-9]+\\): \\(.*\\)" in
+  let run_test_re = Str.regexp "GRADE_TEST \\([0-9]+\\): \\([^ ]*\\) *\\([^ ]*\\)" in
 
   let find_next i =
     try
@@ -109,11 +121,19 @@ let process_file (file : string) : exercise list =
       if Str.string_match manual_re tag 0 then
         let points = int_of_string @@ Str.matched_group 1 tag in
         let comment = Str.matched_group 2 tag in
-        read i name advanced exs (Manual (comment, points) :: items)
-      else if Str.string_match auto_re tag 0 then
+        let meth = Manual comment in
+        read i name advanced exs ({ meth = meth; points = points } :: items)
+      else if Str.string_match check_type_re tag 0 then
         let points = int_of_string @@ Str.matched_group 1 tag in
         let id = Str.matched_group 2 tag in
-        read i name advanced exs (Auto (id, points) :: items)
+        let meth = CheckType id in
+        read i name advanced exs ({ meth = meth; points = points } :: items)
+      else if Str.string_match run_test_re tag 0 then
+        let points = int_of_string @@ Str.matched_group 1 tag in
+        let test_fun = Str.matched_group 2 tag in
+        let id = Str.matched_group 3 tag in
+        let meth = RunTest (test_fun, id) in
+        read i name advanced exs ({ meth = meth; points = points } :: items)
       else
         read i name advanced exs items
     | `End ->
@@ -139,9 +159,12 @@ let () =
   let exs = process_file @@ read_file @@ Printf.sprintf "%s/%s.v" sf_path assignment in
   let ex_auto_grades ex =
     List.fold_left (fun acc i ->
-      match i with
-      | Auto (id, n) ->
-        if compare_defs assignment id then acc + n
+      match i.meth with
+      | CheckType id ->
+        if check_type assignment id then acc + i.points
+        else acc
+      | RunTest (test_fun, id) ->
+        if run_test assignment test_fun id then acc + i.points
         else acc
       | _ -> acc)
       0 ex.ex_items in
@@ -177,12 +200,12 @@ let () =
   Format.fprintf f "Manual Grades@.";
   Format.fprintf f "=============@.@.";
   List.iter (fun ex ->
-    if List.exists is_manual ex.ex_items then begin
+    if List.exists (fun i -> is_manual i.meth) ex.ex_items then begin
       let cat = if ex.ex_advanced then "A" else "S" in
       Format.fprintf f "%s (%s)@." ex.ex_name cat;
       List.iter (fun i ->
-        match i with
-        | Manual (com, n) -> Format.fprintf f "  %s - %d@." com n
+        match i.meth with
+        | Manual com -> Format.fprintf f "  %s - %d@." com i.points
         | _ -> ()
       ) ex.ex_items
     end
