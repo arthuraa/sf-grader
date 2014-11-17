@@ -57,14 +57,14 @@ let read_options () : options =
     match args with
     | v :: args ->
       if !r == None then begin
-        Printf.printf "Error: option %s given multiple times" o;
+        Printf.printf "Error: option %s given multiple times\n\n" o;
         usage ()
       end else begin
         r := Some v;
         args
       end
     | [] ->
-      Printf.printf "Error: option %s requires an argument" o;
+      Printf.printf "Error: option %s requires an argument\n\n" o;
       usage () in
   let rec process args =
     begin match args with
