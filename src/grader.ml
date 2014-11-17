@@ -1,8 +1,36 @@
+type cfg = {
+  cfg_sf_path : string option
+}
+
 type options = {
   sf_path : string;
   submission : string;
   result_dir : string
 }
+
+let (/) = Filename.concat
+
+let cfg =
+  let cfg_path = Sys.getenv "HOME" / ".sf-grader" in
+  let ic = open_in cfg_path in
+  let pairs = Hashtbl.create 10 in
+  let re = Str.regexp "\\([^ =]*\\) *= *\\([^ =]*\\)" in
+  let rec read () =
+    try
+      let line = input_line ic in
+      if Str.string_match re line 0 then
+        let name = Str.matched_group 1 line in
+        let value = Str.matched_group 2 line in
+        Hashtbl.add pairs name value
+      else
+        Printf.printf "Just read line %s" line;
+      read ()
+    with End_of_file -> close_in ic in
+  read ();
+  let cfg_sf_path =
+    try Some (Hashtbl.find pairs "sf-path")
+    with Not_found -> None in
+  { cfg_sf_path = cfg_sf_path }
 
 let usage () : 'a =
   List.iter print_endline [
@@ -16,7 +44,7 @@ let usage () : 'a =
   exit 0
 
 let read_options () : options =
-  let sf_path = ref None in
+  let sf_path = ref cfg.cfg_sf_path in
   let submission = ref None in
   let result_dir = ref None in
   let rec process args =
@@ -68,8 +96,6 @@ let translate_file_name name =
 
 let ensure_dir_exists dir =
   if not @@ Sys.file_exists dir then Unix.mkdir dir 0o744
-
-let (/) = Filename.concat
 
 let noext path =
   try String.sub path 0 (String.rindex path '.')
