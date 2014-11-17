@@ -50,20 +50,27 @@ let usage () : 'a =
   exit 0
 
 let read_options () : options =
-  let sf_path = ref cfg.cfg_sf_path in
+  let sf_path = ref None in
   let submission = ref None in
   let result_dir = ref None in
+  let read_option o r args =
+    match args with
+    | v :: args ->
+      if !r == None then begin
+        Printf.printf "Error: option %s given multiple times" o;
+        usage ()
+      end else begin
+        r := Some v;
+        args
+      end
+    | [] ->
+      Printf.printf "Error: option %s requires an argument" o;
+      usage () in
   let rec process args =
     begin match args with
     | "--help" :: _ -> usage ()
-    | "--sf-path" :: path :: args ->
-      sf_path := Some path;
-      process args
-    | "--sf-path" :: _ -> usage ()
-    | "-o" :: path :: args ->
-      result_dir := Some path;
-      process args
-    | "-o" :: _ -> usage ()
+    | "--sf-path" :: args -> process @@ read_option "--sf-path" sf_path args
+    | "-o" :: args -> process @@ read_option "-o" result_dir args
     | path :: args ->
       if !submission == None then
         (submission := Some path;
@@ -72,16 +79,26 @@ let read_options () : options =
     | [] -> ()
     end in
   let args = Array.to_list Sys.argv in
-  process (List.tl args);
-  match !sf_path, !submission with
-  | Some sf_path, Some submission ->
-    { result_dir =
-        begin match !result_dir with
-        | Some rf -> rf
-        | None -> "submissions"
-        end;
-      sf_path = sf_path; submission = submission }
-  | _, _ -> usage ()
+  process @@ List.tl args;
+  let sf_path =
+    match !sf_path, cfg.cfg_sf_path with
+    | Some sf_path, _
+    | None, Some sf_path -> sf_path
+    | _, _ ->
+      Printf.printf "Error: Don't know where to find SF files.\n\n";
+      usage () in
+  let submission =
+    match !submission with
+    | Some submission -> submission
+    | _ ->
+      Printf.printf "Error: No submission file given.\n\n";
+      usage () in
+  { result_dir =
+      begin match !result_dir with
+      | Some rf -> rf
+      | None -> "submissions"
+      end;
+    sf_path = sf_path; submission = submission }
 
 let o = read_options ()
 
