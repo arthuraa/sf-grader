@@ -69,8 +69,7 @@ let translate_file_name name =
 let ensure_dir_exists dir =
   if not @@ Sys.file_exists dir then Unix.mkdir dir 0o744
 
-let (/) base name =
-  base ^ "/" ^ name
+let (/) = Filename.concat
 
 let noext path =
   try String.sub path 0 (String.rindex path '.')
