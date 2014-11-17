@@ -8,9 +8,32 @@ open Printer
 open Term
 open Util
 
+type id = {
+  mods : string list;
+  name : string
+}
+
+let read_id s =
+  let dot = Str.regexp "\\." in
+  let names = Str.split dot s in
+  let rec loop names =
+    match names with
+    | [] -> failwith @@ Format.sprintf "Error while parsing identifier %s" s
+    | [name] -> { mods = []; name = name }
+    | mod_name :: names -> let id = loop names in
+                           { mods = mod_name :: id.mods;
+                             name = id.name } in
+  loop names
+
+let pp_id (f : Format.formatter) (id : id) =
+  Format.pp_print_list
+    ~pp_sep:(fun f () -> Format.pp_print_string f ".")
+    Format.pp_print_string f
+    (id.mods @ [id.name])
+
 type meth =
-| CheckType of string
-| RunTest of string * string
+| CheckType of id
+| RunTest of id * id
 | Manual of string
 
 type item = {
@@ -55,7 +78,10 @@ let has_no_assumptions (id : global_reference) : bool =
 let is_conv (t1 : constr) (t2 : constr) : bool =
   is_conv empty_env Evd.empty t1 t2
 
-let ofind_reference (path : string list) (id : string) : global_reference option =
+let find_reference (message : string) (path : string list) (id : id) : global_reference =
+  find_reference message (path @ id.mods) id.name
+
+let ofind_reference (path : string list) (id : id) : global_reference option =
   try
     Some (find_reference "" path id)
   with
@@ -63,7 +89,7 @@ let ofind_reference (path : string list) (id : string) : global_reference option
 
 (** Compare the type of a definition against the one it should have,
     given in the SF sources *)
-let check_type (file : string) (id : string) : bool =
+let check_type (file : string) (id : id) : bool =
   let orig = find_reference "Couldn't find original definition in SF file"
     [file] id in
   let sub = ofind_reference ["Submission"] id in
@@ -79,8 +105,8 @@ let check_type (file : string) (id : string) : bool =
     torig = tnew && has_no_assumptions sub
   | None -> false
 
-let run_test (file : string) (test_fun : string) (id : string) : bool =
-  Format.printf "Should run %s on %s@." test_fun id;
+let run_test (file : string) (test_fun : id) (id : id) : bool =
+  Format.printf "Should run %a on %a@." pp_id test_fun pp_id id;
   false
 
 let read_file (path : string) : string =
@@ -96,7 +122,7 @@ let process_file (file : string) : exercise list =
   let ex_re = Str.regexp "\\(EX[^ ]*\\) +(\\(.*\\))" in
   let manual_re = Str.regexp "GRADE_MANUAL \\([0-9]+\\): \\(.*\\)" in
   let check_type_re = Str.regexp "GRADE_THEOREM \\([0-9]+\\): \\(.*\\)" in
-  let run_test_re = Str.regexp "GRADE_TEST \\([0-9]+\\): \\([^ ]*\\) *\\([^ ]*\\)" in
+  let run_test_re = Str.regexp "GRADE_TEST \\([0-9]+\\): \\([^ ]*\\) +\\([^ ]*\\)" in
 
   let find_next i =
     try
@@ -125,13 +151,13 @@ let process_file (file : string) : exercise list =
         read i name advanced exs ({ meth = meth; points = points } :: items)
       else if Str.string_match check_type_re tag 0 then
         let points = int_of_string @@ Str.matched_group 1 tag in
-        let id = Str.matched_group 2 tag in
+        let id = read_id @@ Str.matched_group 2 tag in
         let meth = CheckType id in
         read i name advanced exs ({ meth = meth; points = points } :: items)
       else if Str.string_match run_test_re tag 0 then
         let points = int_of_string @@ Str.matched_group 1 tag in
-        let test_fun = Str.matched_group 2 tag in
-        let id = Str.matched_group 3 tag in
+        let test_fun = read_id @@ Str.matched_group 2 tag in
+        let id = read_id @@ Str.matched_group 3 tag in
         let meth = RunTest (test_fun, id) in
         read i name advanced exs ({ meth = meth; points = points } :: items)
       else
