@@ -70,13 +70,21 @@ let sf_path = Sys.getenv "SFGRADERSFPATH"
 let assignment = Sys.getenv "SFGRADERASSIGNMENT"
 let result_file = Sys.getenv "SFGRADERRESULT"
 
-let has_no_assumptions (id : global_reference) : bool =
-  constr_of_global id |>
-  Assumptions.assumptions ~add_opaque:false Names.full_transparent_state |>
-  Assumptions.ContextObjectMap.is_empty
-
 let is_conv (t1 : constr) (t2 : constr) : bool =
   is_conv empty_env Evd.empty t1 t2
+
+let has_no_assumptions (id : global_reference) (allowed : Refset.t) : bool =
+  let assumptions =
+    constr_of_global id |>
+    Assumptions.assumptions ~add_opaque:false Names.full_transparent_state in
+  Assumptions.ContextObjectMap.for_all (fun obj ty ->
+    match obj with
+    | Assumptions.Axiom c ->
+      let b = Refset.exists (fun c' -> is_conv ty (type_of_global c')) allowed in
+      Format.printf "using %a %b@." Pp.pp_with (Names.pr_con c) b;
+      b
+    | _ -> false
+  ) assumptions
 
 let find_reference (message : string) (path : string list) (id : id) : global_reference =
   find_reference message (path @ id.mods) id.name
@@ -89,7 +97,7 @@ let ofind_reference (path : string list) (id : id) : global_reference option =
 
 (** Compare the type of a definition against the one it should have,
     given in the SF sources *)
-let check_type (file : string) (id : id) : bool =
+let check_type (file : string) (id : id) (allowed : Refset.t) : bool =
   let orig = find_reference "Couldn't find original definition in SF file"
     [file] id in
   let sub = ofind_reference ["Submission"] id in
@@ -102,7 +110,7 @@ let check_type (file : string) (id : id) : bool =
     let tnew =
       Str.global_replace (Str.regexp_string "\n") "" @@
         string_of_ppcmds @@ pr_constr @@ type_of_global sub in
-    torig = tnew && has_no_assumptions sub
+    torig = tnew && has_no_assumptions sub allowed
   | None -> false
 
 let run_test (file : string) (test_fun : id) (id : id) : bool =
@@ -189,11 +197,15 @@ let () =
   let out = open_out result_file in
   let f   = Format.formatter_of_out_channel out in
   let exs = process_file @@ read_file @@ Printf.sprintf "%s/%s.v" sf_path assignment in
+  let allowed =
+    Refset.singleton @@
+      find_reference "Couldn't find functional_extensionality"
+      [assignment] { mods = []; name = "functional_extensionality" } in
   let ex_auto_grades ex =
     List.fold_left (fun acc i ->
       match i.meth with
       | CheckType id ->
-        if check_type assignment id then acc + i.points
+        if check_type assignment id allowed then acc + i.points
         else acc
       | RunTest (test_fun, id) ->
         if run_test assignment test_fun id then acc + i.points
