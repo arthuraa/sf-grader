@@ -106,8 +106,14 @@ let check_type (file : string) (id : id) : bool =
   | None -> false
 
 let run_test (file : string) (test_fun : id) (id : id) : bool =
-  Format.printf "Should run %a on %a@." pp_id test_fun pp_id id;
-  false
+  let test_fun = find_reference "Couldn't find test function in SF file"
+    [file] test_fun in
+  let def = ofind_reference ["Submission"] id in
+  match def with
+  | Some def ->
+    is_conv (mkApp (constr_of_global test_fun, [|constr_of_global def|]))
+      (constr_of_global glob_true)
+  | None -> false
 
 let read_file (path : string) : string =
   let chan = open_in path in
