@@ -12,21 +12,27 @@ let (/) = Filename.concat
 
 let cfg =
   let cfg_path = Sys.getenv "HOME" / ".sf-grader" in
-  let ic = open_in cfg_path in
   let pairs = Hashtbl.create 10 in
   let re = Str.regexp "\\([^ =]*\\) *= *\\([^ =]*\\)" in
-  let rec read () =
+  begin
     try
-      let line = input_line ic in
-      if Str.string_match re line 0 then
-        let name = Str.matched_group 1 line in
-        let value = Str.matched_group 2 line in
-        Hashtbl.add pairs name value
-      else
-        Printf.printf "Just read line %s" line;
-      read ()
-    with End_of_file -> close_in ic in
-  read ();
+      let ic = open_in cfg_path in
+      let rec read () =
+        try
+          let line = input_line ic in
+          if Str.string_match re line 0 then
+            let name = Str.matched_group 1 line in
+            let value = Str.matched_group 2 line in
+            Hashtbl.add pairs name value
+          else
+            Printf.printf "Just read line %s" line;
+          read ()
+        with End_of_file -> close_in ic in
+      read ();
+    with Sys_error _ ->
+    (* File probably doesn't exist; simply leave option table empty *)
+      ()
+  end;
   let cfg_sf_path =
     try Some (Hashtbl.find pairs "sf-path")
     with Not_found -> None in
