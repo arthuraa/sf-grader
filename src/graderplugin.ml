@@ -156,9 +156,9 @@ let process_file (file : string) : exercise list =
         read i name advanced exs ({ meth = meth; points = points } :: items)
       else if Str.string_match run_test_re tag 0 then
         let points = int_of_string @@ Str.matched_group 1 tag in
-        let test_fun = read_id @@ Str.matched_group 2 tag in
-        let id = read_id @@ Str.matched_group 3 tag in
-        let meth = RunTest (test_fun, id) in
+        let test_fun = Str.matched_group 2 tag in
+        let id = Str.matched_group 3 tag in
+        let meth = RunTest (read_id test_fun, read_id id) in
         read i name advanced exs ({ meth = meth; points = points } :: items)
       else
         read i name advanced exs items
