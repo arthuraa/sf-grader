@@ -56,7 +56,7 @@ let read_options () : options =
   let read_option o r args =
     match args with
     | v :: args ->
-      if !r == None then begin
+      if !r <> None then begin
         Printf.printf "Error: option %s given multiple times\n\n" o;
         usage ()
       end else begin
