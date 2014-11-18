@@ -32,7 +32,7 @@ let pp_id (f : Format.formatter) (id : id) =
     (id.mods @ [id.name])
 
 type meth =
-| CheckType of id
+| CheckType of id * id list
 | RunTest of id * id
 | Manual of string
 
@@ -42,7 +42,7 @@ type item = {
 }
 
 let is_auto = function
-  | CheckType _ -> true
+  | CheckType (_,_) -> true
   | RunTest (_,_) -> true
   | _ -> false
 
@@ -81,9 +81,7 @@ let has_no_assumptions (id : global_reference) (allowed : Refset.t) : bool =
   Assumptions.ContextObjectMap.for_all (fun obj ty ->
     match obj with
     | Assumptions.Axiom c ->
-      let b = Refset.exists (fun c' -> is_conv ty (type_of_global c')) allowed in
-      Format.printf "using %a %b@." Pp.pp_with (Names.pr_con c) b;
-      b
+      Refset.exists (fun c' -> is_conv ty (type_of_global c')) allowed
     | _ -> false
   ) assumptions
 
@@ -91,10 +89,12 @@ let find_reference (message : string) (path : string list) (id : id) : global_re
   find_reference message (path @ id.mods) id.name
 
 let ofind_reference (path : string list) (id : id) : global_reference option =
-  try
-    Some (find_reference "" path id)
-  with
-  | Anomaly (_,_) -> None
+  try Some (find_reference "" path id)
+  with Anomaly (_,_) -> None
+
+let find_reference_sf_or_local (assignment : string) (id : id) : global_reference option =
+  try Some (find_reference "" [assignment] id)
+  with Anomaly (_,_) -> ofind_reference ["Submission"] id
 
 (** Compare the type of a definition against the one it should have,
     given in the SF sources *)
@@ -136,7 +136,7 @@ let process_file (file : string) : exercise list =
   let tag_re = Str.regexp "^(\\* \\([^\n]*\\) \\*)" in
   let ex_re = Str.regexp "\\(EX[^ ]*\\) +(\\(.*\\))" in
   let manual_re = Str.regexp "GRADE_MANUAL \\([0-9]+\\): \\(.*\\)" in
-  let check_type_re = Str.regexp "GRADE_THEOREM \\([0-9]+\\): \\(.*\\)" in
+  let check_type_re = Str.regexp "GRADE_THEOREM \\([0-9]+\\): *\\([^ ]*\\)\\(.*\\)" in
   let run_test_re = Str.regexp "GRADE_TEST \\([0-9]+\\): \\([^ ]*\\) +\\([^ ]*\\)" in
 
   let find_next i =
@@ -166,8 +166,14 @@ let process_file (file : string) : exercise list =
         read i name advanced exs ({ meth = meth; points = points } :: items)
       else if Str.string_match check_type_re tag 0 then
         let points = int_of_string @@ Str.matched_group 1 tag in
-        let id = read_id @@ Str.matched_group 2 tag in
-        let meth = CheckType id in
+        let id = Str.matched_group 2 tag in
+        let rest = Str.matched_group 3 tag in
+        let allowed =
+          if Str.string_match (Str.regexp " *(\\([^)]*\\)) *") rest 0 then
+            List.map read_id @@ Str.split (Str.regexp " +") @@
+              Str.matched_group 1 rest
+          else [] in
+        let meth = CheckType (read_id id, allowed) in
         read i name advanced exs ({ meth = meth; points = points } :: items)
       else if Str.string_match run_test_re tag 0 then
         let points = int_of_string @@ Str.matched_group 1 tag in
@@ -198,14 +204,16 @@ let () =
   let out = open_out result_file in
   let f   = Format.formatter_of_out_channel out in
   let exs = process_file @@ read_file @@ Printf.sprintf "%s/%s.v" sf_path assignment in
-  let allowed =
-    Refset.singleton @@
-      find_reference "Couldn't find functional_extensionality"
-      [assignment] { mods = []; name = "functional_extensionality" } in
   let ex_auto_grades ex =
     List.fold_left (fun acc i ->
       match i.meth with
-      | CheckType id ->
+      | CheckType (id, allowed) ->
+        let allowed =
+          List.fold_left (fun acc id ->
+            match find_reference_sf_or_local assignment id with
+            | Some gr -> Refset.add gr acc
+            | None -> acc
+          ) Refset.empty allowed in
         if check_type assignment id allowed then acc + i.points
         else acc
       | RunTest (test_fun, id) ->

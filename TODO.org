@@ -4,7 +4,7 @@
 * DONE Find all the assumptions used by that constant
 * DONE Make list of all definitions that should be checked
 * DONE Filter permitted assumptions from that list
-* Give allowed assumptions with the exercise name
+* DONE Give allowed assumptions with the exercise name
 * Require Coq library from ML
 * Make a custom coq top level that only runs the plugin
 Not clear that it is possible to do this, since the environment in
