@@ -71,7 +71,8 @@ let assignment = Sys.getenv "SFGRADERASSIGNMENT"
 let result_file = Sys.getenv "SFGRADERRESULT"
 
 let is_conv (t1 : constr) (t2 : constr) : bool =
-  is_conv empty_env Evd.empty t1 t2
+  let env, gamma = Lemmas.get_current_context () in
+  is_conv gamma env t1 t2
 
 let has_no_assumptions (id : global_reference) (allowed : Refset.t) : bool =
   let assumptions =
