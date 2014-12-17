@@ -106,10 +106,12 @@ let check_type (file : string) (id : id) (allowed : Refset.t) : bool =
   | Some sub ->
     let torig =
       Str.global_replace (Str.regexp_string "\n") "" @@
+      Str.global_replace (Str.regexp " +") " " @@
       Str.global_replace (Str.regexp_string @@ file ^ ".") "" @@
         string_of_ppcmds @@ pr_constr @@ type_of_global orig in
     let tnew =
       Str.global_replace (Str.regexp_string "\n") "" @@
+      Str.global_replace (Str.regexp " +") " " @@
         string_of_ppcmds @@ pr_constr @@ type_of_global sub in
     torig = tnew && has_no_assumptions sub allowed
   | None -> false
