@@ -106,4 +106,10 @@ that should be graded manually. The `<comment>` argument in the
 directive is printed in the grading report to remind the human grader
 what to look for when going through the exercise.
 
+### Caveats
+
+When referring to an identifier inside a module, you must write it
+down fully qualified, with all module names preceding it, _even when
+the grading directive occurs inside that module_.
+
   [1]: https://canvas.instructure.com
