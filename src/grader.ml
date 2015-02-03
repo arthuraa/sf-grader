@@ -122,41 +122,13 @@ let translate_file_name name =
 let ensure_dir_exists dir =
   if not @@ Sys.file_exists dir then Unix.mkdir dir 0o744
 
-let noext path =
-  try String.sub path 0 (String.rindex path '.')
-  with
-  | Not_found -> path
-  | Invalid_argument _ -> path
-
-let ext path =
-  try
-    let i = String.rindex path '.' + 1 in
-    String.sub path i (String.length path - i)
-  with
-  | Not_found -> ""
-  | Invalid_argument _ -> ""
-
-let dirname path =
-  try String.sub path 0 (String.rindex path '/')
-  with
-  | Not_found -> "."
-  | Invalid_argument _ -> "."
-
-let basename path =
-  try
-    let i = String.rindex path '/' + 1 in
-    String.sub path i (String.length path - i)
-  with
-  | Not_found -> path
-  | Invalid_argument _ -> path
-
 let cp source dest =
   ignore @@ Sys.command @@ Printf.sprintf "cp %s %s" source dest
 
 let plugin_loader_com = "Declare ML Module \"graderplugin\".\n"
 
 let grade_sub path : unit =
-  let assignment = noext @@ basename path in
+  let assignment = Filename.chop_extension @@ Filename.basename path in
   let ass_copy = workdir / "Submission.v" in
   cp path ass_copy;
   print_string path;
@@ -196,9 +168,10 @@ let grade_subs path =
 let _ =
   if Sys.file_exists workdir then Sys.remove workdir;
   Unix.mkdir workdir 0o744;
-  match ext o.submission with
-  | "zip" -> grade_subs o.submission
-  | "v" -> grade_sub o.submission
-  | _ ->
+  if Filename.check_suffix o.submission ".zip" then
+    grade_subs o.submission
+  else if Filename.check_suffix o.submission ".v" then
+    grade_sub o.submission
+  else
     Printf.printf "Don't know what to do with file %s\n" o.submission;
     exit 1
