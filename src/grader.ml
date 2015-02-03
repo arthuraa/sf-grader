@@ -143,7 +143,7 @@ let grade_sub path : unit =
       Unix.environment () in
     let coqcom =
       Printf.sprintf
-        "coqtop -I %s -I %s -I src -require %s -require Submission > out 2>&1"
+        "coqtop -I %s -I %s -I src -require %s -require Submission > .sf-grader.out 2>&1"
         o.sf_path workdir assignment in
     let proc = Unix.open_process_full coqcom env in
     let input, output, _ = proc in
