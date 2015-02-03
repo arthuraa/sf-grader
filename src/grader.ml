@@ -10,7 +10,16 @@ type options = {
 
 let (/) = Filename.concat
 
-let workdir = ".sf-grader.tmp"
+(** Create a temporary work directory with a random name *)
+let workdir =
+  let tempdir = Filename.get_temp_dir_name () in
+  let rec loop () =
+    let name = tempdir / Printf.sprintf "sf-grader-%d" (Random.int 10000) in
+    if Sys.file_exists name then loop ()
+    else begin
+      Unix.mkdir name 0o700; name
+    end in
+  loop ()
 
 (** Read configuration file and return settings found there *)
 let cfg =
@@ -178,8 +187,6 @@ let grade_subs path =
   ) files
 
 let _ =
-  if Sys.file_exists workdir then Sys.remove workdir;
-  Unix.mkdir workdir 0o744;
   if Filename.check_suffix o.submission ".zip" then
     grade_subs o.submission
   else if Filename.check_suffix o.submission ".v" then
