@@ -12,6 +12,7 @@ let (/) = Filename.concat
 
 let workdir = ".sf-grader.tmp"
 
+(** Read configuration file and return settings found there *)
 let cfg =
   let cfg_path = Sys.getenv "HOME" / ".sf-grader" in
   let pairs = Hashtbl.create 10 in
@@ -51,6 +52,7 @@ let usage () : 'a =
   ];
   exit 0
 
+(** Process command line options *)
 let read_options () : options =
   let sf_path = ref None in
   let submission = ref None in
@@ -127,6 +129,12 @@ let cp source dest =
 
 let plugin_loader_com = "Declare ML Module \"graderplugin\".\n"
 
+(** The main function. It compiles the submission, then spawns a new
+    coqtop process loading the grading plugin, the student's
+    submission and the corresponding SF file to go through each
+    problem to be graded. Notice that we copy the submission to an
+    auxiliary temporary file Submission.v so that we can make sure it
+    doesn't get mixed with the original file. *)
 let grade_sub path : unit =
   let assignment = Filename.chop_extension @@ Filename.basename path in
   let ass_copy = workdir / "Submission.v" in
@@ -151,6 +159,10 @@ let grade_sub path : unit =
     flush output
   end
 
+(** Process an entire zip file with submissions downloaded from
+    Canvas. The extracted files are placed under
+    <submissions-dir>/<students-name>/FileName.v. <submissions-dir> is
+    given by option -o, and defaults to "submissions". *)
 let grade_subs path =
   let com = Printf.sprintf "unzip -qq %s -d %s" path workdir in
   ignore @@ Sys.command com;

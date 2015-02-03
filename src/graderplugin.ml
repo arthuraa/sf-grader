@@ -8,11 +8,14 @@ open Printer
 open Term
 open Util
 
+(** Coq identifiers. { mods = ["Mod1"; ...; "Modn"]; name = "name" }
+    represents identifier "Mod1...Modn.name" *)
 type id = {
   mods : string list;
   name : string
 }
 
+(** Read an identifier from its string representation *)
 let read_id s =
   let dot = Str.regexp "\\." in
   let names = Str.split dot s in
@@ -25,17 +28,38 @@ let read_id s =
                              name = id.name } in
   loop names
 
+(** Formatter for identifiers *)
 let pp_id (f : Format.formatter) (id : id) =
   Format.pp_print_list
     ~pp_sep:(fun f () -> Format.pp_print_string f ".")
     Format.pp_print_string f
     (id.mods @ [id.name])
 
+(** Grading methods. Each file is annotated with grading directives
+    that specify how each exercise should be graded.
+
+    - [CheckType ex axioms] checks whether the submission contains a
+    solution for [ex], and that it has the same type as the one in the
+    SF sources. It also checks whether the solution was admitted or
+    used any axioms, ignoring any axioms present in the [axioms]
+    list.
+
+    - [RunTest test_fun ex] runs Coq function [test_fun], which should
+    be present in the original SF file, passing it [ex] as an
+    argument. If the test returns [true], we count points for this exercise.
+
+    - [Manual comment] doesn't do any checks, but reminds the grader
+    that something should be graded manually. The [comment] is just
+    used to remind the grader what to look for when grading that
+    exercise, and is printed in the result file. *)
+
 type meth =
 | CheckType of id * id list
 | RunTest of id * id
 | Manual of string
 
+(** Each item to be graded consists of a grading method [meth] and a
+    number of [points] saying how much that item is worth. *)
 type item = {
   meth : meth;
   points : int
