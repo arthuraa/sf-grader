@@ -10,6 +10,8 @@ type options = {
 
 let (/) = Filename.concat
 
+let workdir = ".sf-grader.tmp"
+
 let cfg =
   let cfg_path = Sys.getenv "HOME" / ".sf-grader" in
   let pairs = Hashtbl.create 10 in
@@ -155,10 +157,10 @@ let plugin_loader_com = "Declare ML Module \"graderplugin\".\n"
 
 let grade_sub path : unit =
   let assignment = noext @@ basename path in
-  let tmp = "tmp" / "Submission.v" in
-  cp path tmp;
+  let ass_copy = workdir / "Submission.v" in
+  cp path ass_copy;
   print_string path;
-  let res = Sys.command @@ Printf.sprintf "coqc -I %s %s > %s.out 2>&1" o.sf_path tmp path in
+  let res = Sys.command @@ Printf.sprintf "coqc -I %s %s > %s.out 2>&1" o.sf_path ass_copy path in
   if res <> 0 then
     print_endline " compilation error"
   else begin
@@ -169,8 +171,8 @@ let grade_sub path : unit =
       Unix.environment () in
     let coqcom =
       Printf.sprintf
-        "coqtop -I %s -I tmp -I src -require %s -require Submission > out 2>&1"
-        o.sf_path assignment in
+        "coqtop -I %s -I %s -I src -require %s -require Submission > out 2>&1"
+        o.sf_path workdir assignment in
     let proc = Unix.open_process_full coqcom env in
     let input, output, _ = proc in
     output_string output plugin_loader_com;
@@ -178,21 +180,22 @@ let grade_sub path : unit =
   end
 
 let grade_subs path =
-  let com = Printf.sprintf "unzip -qq %s -d %s" path "tmp" in
+  let com = Printf.sprintf "unzip -qq %s -d %s" path workdir in
   ignore @@ Sys.command com;
-  let files = Sys.readdir "tmp" in
+  let files = Sys.readdir workdir in
   ensure_dir_exists o.result_dir;
   Array.iter (fun file ->
     let name, file' = translate_file_name file in
     let dir = o.result_dir / name in
     let path = dir / file' in
     ensure_dir_exists dir;
-    cp ("tmp"/file) path;
+    cp (workdir/file) path;
     grade_sub path
   ) files
 
 let _ =
-  ensure_dir_exists "tmp";
+  if Sys.file_exists workdir then Sys.remove workdir;
+  Unix.mkdir workdir 0o744;
   match ext o.submission with
   | "zip" -> grade_subs o.submission
   | "v" -> grade_sub o.submission
