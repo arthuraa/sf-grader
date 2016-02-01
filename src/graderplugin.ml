@@ -161,9 +161,9 @@ let read_file (path : string) : string =
 let process_file (file : string) : exercise list =
   let tag_re = Str.regexp "^(\\* \\([^\n]*\\) \\*)" in
   let ex_re = Str.regexp "\\(EX[^ ]*\\) +(\\(.*\\))" in
-  let manual_re = Str.regexp "GRADE_MANUAL \\([0-9]+\\): \\(.*\\)" in
-  let check_type_re = Str.regexp "GRADE_THEOREM \\([0-9]+\\): *\\([^ ]*\\)\\(.*\\)" in
-  let run_test_re = Str.regexp "GRADE_TEST \\([0-9]+\\): \\([^ ]*\\) +\\([^ ]*\\)" in
+  let manual_re = Str.regexp "GRADE_MANUAL \\([0-9]+\\) *: \\(.*\\)" in
+  let check_type_re = Str.regexp "GRADE_THEOREM \\([0-9]+\\) *: *\\([^ ]*\\)\\(.*\\)" in
+  let run_test_re = Str.regexp "GRADE_TEST \\([0-9]+\\) *: \\([^ ]*\\) +\\([^ ]*\\)" in
 
   let find_next i =
     try
