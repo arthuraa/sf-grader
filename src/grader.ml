@@ -4,6 +4,7 @@ type cfg = {
 
 type options = {
   sf_path : string;
+  grader_plugin_path : string;
   submission : string;
   result_dir : string
 }
@@ -42,7 +43,7 @@ let cfg =
         with End_of_file -> close_in ic in
       read ();
     with Sys_error _ ->
-    (* File probably doesn't exist; simply leave option table empty *)
+      (* File probably doesn't exist; simply leave option table empty *)
       ()
   end;
   let cfg_sf_path =
@@ -111,7 +112,9 @@ let read_options () : options =
       | Some rf -> rf
       | None -> "submissions"
       end;
-    sf_path = sf_path; submission = submission }
+    sf_path = sf_path;
+    grader_plugin_path = Filename.dirname Sys.executable_name / "src";
+    submission = submission }
 
 let o = read_options ()
 
@@ -136,10 +139,8 @@ let ensure_dir_exists dir =
 let cp source dest =
   ignore @@ Sys.command @@ Printf.sprintf "cp %s %s" source dest
 
-let plugin_loader_com = "Declare ML Module \"graderplugin\".\n"
-
-(** The main function. It compiles the submission, then spawns a new
-    coqtop process loading the grading plugin, the student's
+(** The main grading function. It compiles the submission, then spawns
+    a new coqtop process loading the grading plugin, the student's
     submission and the corresponding SF file to go through each
     problem to be graded. Notice that we copy the submission to an
     auxiliary temporary file Submission.v so that we can make sure it
@@ -148,23 +149,22 @@ let grade_sub path : unit =
   let assignment = Filename.chop_extension @@ Filename.basename path in
   let ass_copy = workdir / "Submission.v" in
   cp path ass_copy;
-  print_string path;
   let res = Sys.command @@ Printf.sprintf "coqc -I %s %s > %s.out 2>&1" o.sf_path ass_copy path in
   if res <> 0 then
-    print_endline " compilation error"
+    Printf.printf "%s: compilation error\n" path
   else begin
-    print_endline " ok";
+    Printf.printf "%s: compiled successfully\n" path;
     let env = Array.append [|"SFGRADERRESULT=" ^ path ^ ".res";
                              "SFGRADERSFPATH=" ^ o.sf_path;
                              "SFGRADERASSIGNMENT=" ^ assignment |] @@
       Unix.environment () in
     let coqcom =
       Printf.sprintf
-        "coqtop -I %s -I %s -I src -require %s -require Submission > .sf-grader.out 2>&1"
-        o.sf_path workdir assignment in
-    let proc = Unix.open_process_full coqcom env in
-    let input, output, _ = proc in
-    output_string output plugin_loader_com;
+        "coqtop -I %s -I %s -I %s -require %s -require Submission >> .sf-grader.log 2>&1"
+        o.sf_path o.grader_plugin_path workdir assignment in
+    let input, output, _ = Unix.open_process_full coqcom env in
+    let plugin_loader_command = "Declare ML Module \"graderplugin\".\n" in
+    output_string output plugin_loader_command;
     flush output
   end
 
