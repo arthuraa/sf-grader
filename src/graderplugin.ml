@@ -38,15 +38,16 @@ let pp_id (f : Format.formatter) (id : id) =
 (** Grading methods. Each file is annotated with grading directives
     that specify how each exercise should be graded.
 
-    - [CheckType ex axioms] checks whether the submission contains a
-    solution for [ex], and that it has the same type as the one in the
-    SF sources. It also checks whether the solution was admitted or
-    used any axioms, ignoring any axioms present in the [axioms]
+    - [CheckType (ex, axioms)] checks whether the submission contains
+    a solution for [ex], and that it has the same type as the one in
+    the SF sources. It also checks whether the solution was admitted
+    or used any axioms, ignoring any axioms present in the [axioms]
     list.
 
-    - [RunTest test_fun ex] runs Coq function [test_fun], which should
-    be present in the original SF file, passing it [ex] as an
-    argument. If the test returns [true], we count points for this exercise.
+    - [RunTest (test_fun, ex)] runs Coq function [test_fun], which
+    should be present in the original SF file, passing it [ex] as an
+    argument. If the test returns [true], we count points for this
+    exercise.
 
     - [Manual comment] doesn't do any checks, but reminds the grader
     that something should be graded manually. The [comment] is just
