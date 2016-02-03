@@ -186,11 +186,13 @@ let grade_subs path =
     grade_sub path
   ) files
 
-let _ =
-  if Filename.check_suffix o.submission ".zip" then
-    grade_subs o.submission
-  else if Filename.check_suffix o.submission ".v" then
-    grade_sub o.submission
-  else
-    Printf.printf "Don't know what to do with file %s\n" o.submission;
-    exit 1
+let main =
+  let grader =
+    if Filename.check_suffix o.submission ".zip"
+    then grade_subs
+    else if Filename.check_suffix o.submission ".v"
+    then grade_sub
+    else (Printf.printf "Don't know what to do with file %s\n" o.submission;
+          exit 1) in
+  grader o.submission;
+  exit 0
