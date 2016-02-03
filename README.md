@@ -48,6 +48,13 @@ Then, you can invoke the grader by entering
 
     ./grader File.v
 
+### Troubleshooting
+
+If anything goes wrong when grading (typically, if no `.res` files are
+produced), look for a `.sf-grader.log` file in the directory where you
+executed the grader. This includes messages from the slave Coq process
+that can be useful to diagnose the problem.
+
 ### Canvas Support
 
 If you happen to be using [Canvas][1] for your class, the grader can
@@ -80,8 +87,8 @@ directives_, which can have the following form:
 
 All the directives that correspond to an exercise _must_ be enclosed
 by that exercise's opening and closing tags (i.e., between `(* EXn
-..*)` and `(** [] *)` tags). Also, notice that right now cannot span
-over more than one line (patches are welcome).
+..*)` and `(** [] *)` tags). Notice that directives cannot span over
+more than one line (patches are welcome).
 
 The `<n>` argument on each tag is an integer saying how many points
 that item is worth. Right now, we make the total number of points on
@@ -106,10 +113,13 @@ that should be graded manually. The `<comment>` argument in the
 directive is printed in the grading report to remind the human grader
 what to look for when going through the exercise.
 
-### Caveats
+## Known Bugs
 
-When referring to an identifier inside a module, you must write it
-down fully qualified, with all module names preceding it, _even when
-the grading directive occurs inside that module_.
+- When referring to an identifier inside a module, you must write it
+  down fully qualified, with all module names preceding it, _even when
+  the grading directive occurs inside that module_.
+
+- Compiling the grader produces an ML plugin in the `src`
+  directory. That plugin cannot be moved.
 
   [1]: https://canvas.instructure.com
