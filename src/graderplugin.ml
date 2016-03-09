@@ -2,16 +2,12 @@ open Reductionops
 open Coqlib
 open Environ
 open Global
-open Globnames
 open Libnames
 open Pp
 open Printer
 open Term
-open Universes
 open Util
 
-type exn += Anomaly of (string option * std_ppcmds)
-       
 (** Coq identifiers. { mods = ["Mod1"; ...; "Modn"]; name = "name" }
     represents identifier "Mod1...Modn.name" *)
 type id = {
@@ -105,12 +101,12 @@ let is_conv (t1 : constr) (t2 : constr) : bool =
 
 let has_no_assumptions (id : global_reference) (allowed : Refset.t) : bool =
   let assumptions =
-    Assumptions.assumptions ~add_opaque:false ~add_transparent:false
-                            Names.full_transparent_state id (constr_of_global id) in
-  Printer.ContextObjectMap.for_all (fun obj ty ->
+    constr_of_global id |>
+    Assumptions.assumptions ~add_opaque:false Names.full_transparent_state in
+  Assumptions.ContextObjectMap.for_all (fun obj ty ->
     match obj with
-    | Printer.Axiom (c,_) ->
-      Refset.exists (fun c' -> is_conv ty (constr_of_global c')) allowed
+    | Assumptions.Axiom c ->
+      Refset.exists (fun c' -> is_conv ty (type_of_global c')) allowed
     | _ -> false
   ) assumptions
 
@@ -137,11 +133,11 @@ let check_type (file : string) (id : id) (allowed : Refset.t) : bool =
       Str.global_replace (Str.regexp_string "\n") "" @@
       Str.global_replace (Str.regexp " +") " " @@
       Str.global_replace (Str.regexp_string @@ file ^ ".") "" @@
-        string_of_ppcmds @@ pr_constr @@ constr_of_global orig in
+        string_of_ppcmds @@ pr_constr @@ type_of_global orig in
     let tnew =
       Str.global_replace (Str.regexp_string "\n") "" @@
       Str.global_replace (Str.regexp " +") " " @@
-        string_of_ppcmds @@ pr_constr @@ constr_of_global sub in
+        string_of_ppcmds @@ pr_constr @@ type_of_global sub in
     torig = tnew && has_no_assumptions sub allowed
   | None -> false
 
@@ -158,7 +154,7 @@ let run_test (file : string) (test_fun : id) (id : id) : bool =
 let read_file (path : string) : string =
   let chan = open_in path in
   let nbytes = in_channel_length chan in
-  let s = Bytes.create nbytes in
+  let s = String.create nbytes in
   really_input chan s 0 nbytes;
   close_in chan;
   s
