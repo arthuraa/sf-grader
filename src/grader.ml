@@ -162,10 +162,11 @@ let grade_sub path : unit =
       Printf.sprintf
         "coqtop -I %s -I %s -I %s -require %s -require Submission >> .sf-grader.log 2>&1"
         o.sf_path o.grader_plugin_path workdir assignment in
-    let input, output, _ = Unix.open_process_full coqcom env in
+    let input, output, error = Unix.open_process_full coqcom env in
     let plugin_loader_command = "Declare ML Module \"graderplugin\".\n" in
     output_string output plugin_loader_command;
-    flush output
+    flush output;
+    ignore (Unix.close_process_full (input,output,error))
   end
 
 (** Process an entire zip file with submissions downloaded from
