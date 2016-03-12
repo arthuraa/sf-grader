@@ -14,3 +14,5 @@ the Coq executable is pretty restrictive.
 * Exclude advanced exercises for standard students
 * DONE Remove "-late" suffix from Canvas' names
 * (Maybe?) Link submissions against students' previous files.
+* Handle nested modules more gracefully
+** Detect Module and EndModule to automatically qualify names as necessary?
