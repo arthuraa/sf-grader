@@ -185,38 +185,33 @@ let read_file (path : string) : string =
   close_in chan;
   s
 
+(** Reads the string given as its argument, collecting all exercises
+    that are found there. *)
 let process_file (file : string) : exercise list =
-  let tag_re = Str.regexp "^(\\* \\([^\n]*\\) \\*)" in
-  let ex_re = Str.regexp "\\(EX[^ ]*\\) +(\\(.*\\))" in
+  let tag_re = Str.regexp "^(\\*\\*? *\\([^\n]*\\) *\\*)" in
+  let ex_begin_re = Str.regexp ".*\\(EX[^ ]*\\) +(\\(.*\\))" in
+  let ex_end_re = Str.regexp "\\[\\]" in
   let manual_re = Str.regexp "GRADE_MANUAL \\([0-9]+\\) *: \\(.*\\)" in
   let check_type_re = Str.regexp "GRADE_THEOREM \\([0-9]+\\) *: *\\([^ ]*\\)\\(.*\\)" in
   let run_test_re = Str.regexp "GRADE_TEST \\([0-9]+\\) *: \\([^ ]*\\) +\\([^ ]*\\)" in
 
-  let find_next i =
+  (* Rudimentary lexer. Starts parsing file at position 0, collecting
+     everything that could be an exercise or grading directive *)
+  let read_tag =
+    let cur_pos = ref 0 in fun () ->
     try
-      let _ = Str.search_forward tag_re file i in
-      let j = Str.match_end () in
+      let _ = Str.search_forward tag_re file (!cur_pos) in
+      cur_pos := Str.match_end ();
       let tag = Str.matched_group 1 file in
-      if Str.string_match ex_re tag 0 then
+      if Str.string_match ex_begin_re tag 0 then
         let name = Str.matched_group 2 tag in
         let advanced = String.contains (Str.matched_group 1 tag) 'A' in
-        `New_ex (name, advanced, j)
-      else `Tag (tag, j)
-    with Not_found -> `End in
-
-  let rec read i name advanced exs items =
-    match find_next i with
-    | `New_ex (name', advanced', i) ->
-      let ex = { ex_name = name;
-                 ex_advanced = advanced;
-                 ex_items = List.rev items } in
-      read i name' advanced' (ex :: exs) []
-    | `Tag (tag, i) ->
-      if Str.string_match manual_re tag 0 then
+        `ExerciseBegin (name, advanced)
+      else if Str.string_match manual_re tag 0 then
         let points = int_of_string @@ Str.matched_group 1 tag in
         let comment = Str.matched_group 2 tag in
         let meth = Manual comment in
-        read i name advanced exs ({ meth = meth; points = points } :: items)
+        `Item ({ meth = meth; points = points })
       else if Str.string_match check_type_re tag 0 then
         let points = int_of_string @@ Str.matched_group 1 tag in
         let id = Str.matched_group 2 tag in
@@ -227,29 +222,47 @@ let process_file (file : string) : exercise list =
               Str.matched_group 1 rest
           else [] in
         let meth = CheckType (read_id id, allowed) in
-        read i name advanced exs ({ meth = meth; points = points } :: items)
+        `Item ({ meth = meth; points = points })
       else if Str.string_match run_test_re tag 0 then
         let points = int_of_string @@ Str.matched_group 1 tag in
         let test_fun = Str.matched_group 2 tag in
         let id = Str.matched_group 3 tag in
         let meth = RunTest (read_id test_fun, read_id id) in
-        read i name advanced exs ({ meth = meth; points = points } :: items)
+        `Item ({ meth = meth; points = points })
+      else if Str.string_match ex_end_re tag 0 then
+        `ExerciseEnd
       else
-        read i name advanced exs items
+        `Other tag
+    with Not_found -> `End in
+
+  let rec read_exercise name advanced exs items =
+    let finish_ex () =
+      { ex_name = name;
+        ex_advanced = advanced;
+        ex_items = List.rev items } in
+
+    match read_tag () with
+    | `ExerciseBegin (name', advanced') ->
+      Format.printf "Warning: unterminated exercise %s ran into %s@." name name';
+      read_exercise name' advanced' (finish_ex () :: exs) []
+    | `Item item ->
+      read_exercise name advanced exs (item :: items)
+    | `ExerciseEnd ->
+      read_exercises (finish_ex () :: exs)
+    | `Other _ -> read_exercise name advanced exs items
     | `End ->
-      let ex = { ex_name = name;
-                 ex_advanced = advanced;
-                 ex_items = List.rev items } in
-      List.rev (ex :: exs) in
+      Format.printf "Warning: found EOF before finishing exercise %s@." name;
+      List.rev (finish_ex () :: exs)
 
-  let rec find_first_ex i =
-    match find_next i with
-    | `New_ex (name, advanced, i) ->
-      read i name advanced [] []
-    | `Tag (_, i) -> find_first_ex i
-    | `End -> [] in
+  and read_exercises (exs : exercise list) =
+    match read_tag () with
+    | `ExerciseBegin (name, advanced) ->
+      read_exercise name advanced exs []
+    | `End -> List.rev exs
+    | `Item _ | `ExerciseEnd | `Other _ ->
+      read_exercises exs in
 
-  find_first_ex 0
+  read_exercises []
 
 let () =
   Mltop.add_known_plugin (fun () -> ()) "grader";
