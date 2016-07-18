@@ -99,7 +99,10 @@ definition named `<theorem-name>` whose type matches the one of the
 corresponding term in the original SF sources. It also checks that it
 wasn't admitted or contains any axioms. If you want to allow specific
 axioms, you can mark those in a space-separated list enclosed by
-parentheses.
+parentheses. Note that if you want to reference any standard Coq
+axioms, you must use their fully qualified name; e.g.,
+
+    Coq.Logic.FunctionalExtensionality.functional_extensionality_dep
 
 `GRADE_TEST` looks for a definition `<test-fun>` in the SF sources,
 which should have type `A -> bool`. It then looks for a definition
