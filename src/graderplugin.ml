@@ -59,12 +59,30 @@ type meth =
 | RunTest of id * id
 | Manual of string
 
+let pp_meth (f : Format.formatter) (m : meth) =
+  match m with
+  | CheckType (ex, axioms) ->
+    Format.fprintf f "CheckType {ex = %a, axioms = [%a]}"
+      pp_id ex
+      (Format.pp_print_list
+         ~pp_sep:(fun f () -> Format.pp_print_string f ", ")
+         pp_id)
+      axioms
+  | RunTest (test_fun, ex) ->
+    Format.fprintf f "RunTest {test = %a, ex = %a}"
+      pp_id test_fun pp_id ex
+  | Manual comment -> Format.fprintf f "Manual \"%s\"" comment
+
 (** Each item to be graded consists of a grading method [meth] and a
     number of [points] saying how much that item is worth. *)
 type item = {
   meth : meth;
   points : int
 }
+
+let pp_item (f : Format.formatter) (i : item) =
+  Format.fprintf f "%a (%d points)"
+    pp_meth i.meth i.points
 
 let is_auto = function
   | CheckType (_,_) -> true
@@ -78,6 +96,14 @@ type exercise = {
   ex_advanced : bool;
   ex_items : item list
 }
+
+let pp_exercise (f : Format.formatter) (ex : exercise) =
+  Format.fprintf f "%s (%s) %a"
+    ex.ex_name
+    (if ex.ex_advanced then "A" else "S")
+    (Format.pp_print_list
+       ~pp_sep:(fun f () -> Format.pp_print_string f ", ") pp_item)
+    ex.ex_items
 
 let ex_points f ex =
   List.fold_left (fun acc i ->
@@ -301,3 +327,7 @@ let () =
       else acc
     ) 0 exs in
   Format.fprintf f "@.Standard: -/%d@.Advanced: -/%d@." max_std_manual max_adv_manual
+
+(* Local Variables: *)
+(* compile-command: "make -k -C .." *)
+(* End: *)
