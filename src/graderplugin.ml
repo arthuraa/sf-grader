@@ -55,7 +55,7 @@ let pp_id (f : Format.formatter) (id : id) =
     exercise, and is printed in the result file. *)
 
 type meth =
-| CheckType of id * id list
+| CheckType of id * Names.constant list
 | RunTest of id * id
 | Manual of string
 
@@ -66,7 +66,7 @@ let pp_meth (f : Format.formatter) (m : meth) =
       pp_id ex
       (Format.pp_print_list
          ~pp_sep:(fun f () -> Format.pp_print_string f ", ")
-         pp_id)
+         (fun f c -> Format.pp_print_string f (string_of_ppcmds (Names.pr_con c))))
       axioms
   | RunTest (test_fun, ex) ->
     Format.fprintf f "RunTest {test = %a, ex = %a}"
@@ -125,14 +125,16 @@ let is_conv (t1 : constr) (t2 : constr) : bool =
   let env, gamma = Lemmas.get_current_context () in
   is_conv gamma env t1 t2
 
-let has_no_assumptions (id : global_reference) (allowed : Refset.t) : bool =
+let has_no_assumptions (id : global_reference) (allowed : Names.constant list) : bool =
   let assumptions =
     constr_of_global id |>
     Assumptions.assumptions ~add_opaque:false Names.full_transparent_state in
   Assumptions.ContextObjectMap.for_all (fun obj ty ->
     match obj with
     | Assumptions.Axiom c ->
-      Refset.exists (fun c' -> is_conv ty (type_of_global c')) allowed
+      List.exists (fun c' ->
+        let ty' = type_of_global (ConstRef c') in
+        is_conv ty ty') allowed
     | _ -> false
   ) assumptions
 
@@ -143,13 +145,21 @@ let ofind_reference (path : string list) (id : id) : global_reference option =
   try Some (find_reference "" path id)
   with Anomaly (_,_) -> None
 
-let find_reference_sf_or_local (assignment : string) (id : id) : global_reference option =
-  try Some (find_reference "" [assignment] id)
-  with Anomaly (_,_) -> ofind_reference ["Submission"] id
+(** Tries to find the given axiom in the original SF sources, the
+    student's submission, and at the top level. *)
+let find_axiom (id : id) : Names.constant option =
+  let gr =
+    try Some (find_reference "" [assignment] id)
+    with Anomaly (_,_) ->
+      try Some (find_reference "" ["Submission"] id)
+      with Anomaly (_,_) -> ofind_reference [] id in
+  match gr with
+  | Some (ConstRef c) -> Some c
+  | _ -> None
 
 (** Compare the type of a definition against the one it should have,
     given in the SF sources *)
-let check_type (file : string) (id : id) (allowed : Refset.t) : bool =
+let check_type (file : string) (id : id) (allowed : Names.constant list) : bool =
   let orig = find_reference "Couldn't find original definition in SF file"
     [file] id in
   let sub = ofind_reference ["Submission"] id in
@@ -218,8 +228,11 @@ let process_file (file : string) : exercise list =
         let rest = Str.matched_group 3 tag in
         let allowed =
           if Str.string_match (Str.regexp " *(\\([^)]*\\)) *") rest 0 then
-            List.map read_id @@ Str.split (Str.regexp " +") @@
-              Str.matched_group 1 rest
+            List.fold_left (fun acc str ->
+              match find_axiom (read_id str) with
+              | Some ax -> ax :: acc
+              | None -> Format.printf "Warning: couldn't find reference to axiom %s@." str; acc)
+            [] @@ Str.split (Str.regexp " +") @@ Str.matched_group 1 rest
           else [] in
         let meth = CheckType (read_id id, allowed) in
         `Item ({ meth = meth; points = points })
@@ -274,12 +287,6 @@ let () =
     List.fold_left (fun acc i ->
       match i.meth with
       | CheckType (id, allowed) ->
-        let allowed =
-          List.fold_left (fun acc id ->
-            match find_reference_sf_or_local assignment id with
-            | Some gr -> Refset.add gr acc
-            | None -> acc
-          ) Refset.empty allowed in
         if check_type assignment id allowed then acc + i.points
         else acc
       | RunTest (test_fun, id) ->
